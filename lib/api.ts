@@ -14,9 +14,9 @@ export interface LoginRequest {
 }
 
 export interface UpdateProfileRequest {
-  full_name: string
+  full_name?: string | null
   email: string
-  phone: string
+  phone?: string | null
 }
 
 export interface UpdatePasswordRequest {
@@ -45,10 +45,28 @@ export interface UserProfile {
 
 class ApiClient {
   private getAuthHeaders() {
-    const token = localStorage.getItem("auth_token")
-    return {
-      ...(token && { Authorization: `Bearer ${token}` }),
+    const rawToken = localStorage.getItem("auth_token") || ""
+    // Normalize token: strip any leading "Bearer" and whitespace so we add it exactly once
+    const normalizedToken = rawToken.replace(/^Bearer\s+/i, "").trim()
+    const hasToken = normalizedToken.length > 0
+
+    const headers: Record<string, string> = {}
+    if (hasToken) {
+      headers["Authorization"] = `Bearer ${normalizedToken}`
     }
+
+    // Helpful runtime debug to confirm whether we are sending auth
+    try {
+      const masked = hasToken
+        ? `Bearer ${normalizedToken.substring(0, 8)}...`
+        : "<none>"
+      // eslint-disable-next-line no-console
+      console.debug("[v0] Auth header:", masked)
+    } catch {
+      // ignore
+    }
+
+    return headers
   }
 
   async request<T>(endpoint: string, options: (RequestInit & { timeoutMs?: number }) = {}): Promise<ApiResponse<T>> {
@@ -71,9 +89,10 @@ class ApiClient {
       const response = await fetch(`${API_BASE_URL}${safeEndpoint}`, {
         mode: "cors",
         credentials: "include",
+        ...fetchOptions,
+        // IMPORTANT: set merged headers LAST so they are not overwritten
         headers,
         signal: controller.signal,
-        ...fetchOptions,
       })
 
       clearTimeout(timeoutId)
@@ -177,7 +196,7 @@ class ApiClient {
   }
 
   async updateProfile(profileData: UpdateProfileRequest) {
-    return this.request("/auth/update_profile", {
+    return this.request<UserProfile>("/auth/update_profile", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(profileData),
@@ -185,7 +204,13 @@ class ApiClient {
   }
 
   async updatePassword(passwordData: UpdatePasswordRequest) {
-    return this.request("/auth/update_password", {
+    // Backend returns a message; in some implementations it may also
+    // return new tokens (rotate). Preserve that possibility here.
+    return this.request<{
+      message?: string
+      access_token?: string
+      refresh_token?: string
+    }>("/auth/update_password", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(passwordData),

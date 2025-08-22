@@ -128,10 +128,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (response.success && response.data && isValidUser(response.data)) {
       setUser(response.data);
       return { success: true };
-    } else {
-      setUser(null);
     }
 
+    // Don't clear the current user on a failed profile update. Return the
+    // backend message so the UI can display it.
     return { success: false, message: response.message };
   }
 
@@ -139,6 +139,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const response = await apiClient.updatePassword(passwordData)
 
     if (response.success) {
+      // If backend rotated tokens, save the new one(s)
+      const data: any = response.data
+      if (data?.access_token) {
+        localStorage.setItem("auth_token", data.access_token)
+      }
+      if (data?.refresh_token) {
+        localStorage.setItem("refresh_token", data.refresh_token)
+      }
       return { success: true }
     }
 
