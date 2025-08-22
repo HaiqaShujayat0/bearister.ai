@@ -1,0 +1,14 @@
+@import "tailwindcss";
+@import "./styles/variables.css";
+
+html,
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  color-scheme: dark;
+}
+
+/* Hide sidebar scrollbar similar to Next app */
+.sidebar-scroll::-webkit-scrollbar { width: 0; height: 0; }
+.sidebar-scroll { scrollbar-width: none; }
+
