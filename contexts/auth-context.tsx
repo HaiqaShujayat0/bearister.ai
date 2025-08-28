@@ -5,12 +5,14 @@ import { createContext, useContext, useState, useEffect } from "react"
 import { apiClient, type LoginResponse, type UserProfile } from "@/lib/api"
 
 function isValidUser(data: any): data is UserProfile {
-  return (
+  const isValid = (
     typeof data === "object" &&
     data !== null &&
     typeof data.full_name === "string" &&
     typeof data.email === "string"
   );
+  console.log("[v0] isValidUser check:", { data, isValid });
+  return isValid;
 }
 
 interface User {
@@ -18,14 +20,21 @@ interface User {
   full_name: string
   email: string
   phone?: string
+  is_superadmin?: boolean
 }
 
 interface AuthContextType {
   user: User | null
   isLoading: boolean
   isAuthenticated: boolean
-  login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>
+  isAdmin: boolean
+  login: (email: string, password: string) => Promise<{ success: boolean; message?: string; isAdmin?: boolean }>
+  adminLogin: (email: string, password: string) => Promise<{ success: boolean; message?: string }>
   register: (userData: { full_name: string; email: string; password: string; agree_terms: boolean }) => Promise<{
+    success: boolean
+    message?: string
+  }>
+  adminRegister: (userData: { full_name: string; email: string; password: string; agree_terms: boolean }) => Promise<{
     success: boolean
     message?: string
   }>
@@ -47,13 +56,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
 
   const isAuthenticated = !!user
+  const isAdmin = ((): boolean => {
+    if (typeof window === "undefined") return false
+    const stored = window.localStorage?.getItem("is_admin")
+    const flag = stored === "true"
+    const userIsAdmin = Boolean(user?.is_superadmin)
+    const result = userIsAdmin || flag
+    console.log("[v0] Admin detection:", { 
+      userIsAdmin, 
+      storedFlag: stored, 
+      flag, 
+      result,
+      user: user 
+    })
+    return result
+  })()
 
   useEffect(() => {
     checkAuthStatus()
   }, [])
 
   const checkAuthStatus = async () => {
-    const token = localStorage.getItem("auth_token")
+    const token = typeof window !== "undefined" ? window.localStorage.getItem("auth_token") : null
     if (!token) {
       setIsLoading(false)
       return
@@ -70,16 +94,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const login = async (email: string, password: string) => {
-    console.log("[v0] Starting login with email:", email)
+    console.log("[v0] Starting regular user login with email:", email)
 
+    // Only try regular user login - reject admin users
     const response = await apiClient.login({ email, password });
-    console.log("[v0] Login response:", response);
+    console.log("[v0] Regular user login response:", response)
 
     if (response.success && response.data) {
       const token = (response.data as LoginResponse).access_token || (response.data as LoginResponse).token || (response.data as LoginResponse).auth_token;
-      if (token) {
-        localStorage.setItem("auth_token", token);
+      if (token && typeof window !== "undefined") {
+        window.localStorage.setItem("auth_token", token);
         console.log("[v0] Token saved:", token);
+      }
+
+      // Check if user is admin from response data
+      const userData = response.data as any;
+      const isAdminUser = userData?.user?.is_superadmin === true || userData?.role === "superadmin";
+      console.log("[v0] User data:", userData);
+      console.log("[v0] Is admin user:", isAdminUser);
+      
+      // If this is an admin user trying to login through regular login, reject them
+      if (isAdminUser) {
+        console.log("[v0] Admin user detected in regular login - rejecting");
+        // Clear any token that might have been set
+        if (typeof window !== "undefined") {
+          window.localStorage.removeItem("auth_token");
+        }
+        return { 
+          success: false, 
+          message: "Administrators must use the admin login page. Please visit /admin-login" 
+        };
+      }
+
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("is_admin", "false")
       }
 
       // Kick off profile fetch in the background; don't block login UX
@@ -94,10 +142,70 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.warn("[v0] Profile fetch failed:", err);
       });
 
-      return { success: true };
+      return { success: true, isAdmin: false };
     }
 
     return { success: false, message: response.message || "Login failed" };
+  }
+
+  const adminLogin = async (email: string, password: string) => {
+    console.log("[v0] Starting admin login with email:", email)
+
+    // Only try superadmin login
+    const response = await apiClient.loginSuperadmin({ email, password });
+    console.log("[v0] Superadmin login response:", response)
+
+    if (response.success && response.data) {
+      const token = (response.data as LoginResponse).access_token || (response.data as LoginResponse).token || (response.data as LoginResponse).auth_token;
+      if (token && typeof window !== "undefined") {
+        window.localStorage.setItem("auth_token", token);
+        console.log("[v0] Admin token saved:", token);
+      }
+
+      // Check if user is admin from response data
+      const userData = response.data as any;
+      const isAdminUser = userData?.user?.is_superadmin === true || userData?.role === "superadmin";
+      console.log("[v0] Admin user data:", userData);
+      console.log("[v0] Is admin user:", isAdminUser);
+      
+      if (!isAdminUser) {
+        console.log("[v0] Non-admin user detected in admin login - rejecting");
+        // Clear any token that might have been set
+        if (typeof window !== "undefined") {
+          window.localStorage.removeItem("auth_token");
+        }
+        return { 
+          success: false, 
+          message: "Access denied. This login is for administrators only." 
+        };
+      }
+
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("is_admin", "true")
+      }
+
+      // Kick off profile fetch in the background; don't block login UX
+      void apiClient.getProfile().then((profileResponse) => {
+        console.log("[v0] Admin profile response:", profileResponse);
+        if (profileResponse.success && profileResponse.data && isValidUser(profileResponse.data)) {
+          // Merge the profile data with the login response data to preserve admin status
+          const mergedUser = {
+            ...profileResponse.data,
+            is_superadmin: userData?.user?.is_superadmin || profileResponse.data.is_superadmin
+          };
+          console.log("[v0] Merged admin user data:", mergedUser);
+          setUser(mergedUser);
+        } else {
+          setUser(null);
+        }
+      }).catch((err) => {
+        console.warn("[v0] Admin profile fetch failed:", err);
+      });
+
+      return { success: true };
+    }
+
+    return { success: false, message: response.message || "Admin login failed" };
   }
 
   const register = async (userData: { full_name: string; email: string; password: string; agree_terms: boolean }) => {
@@ -117,8 +225,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { success: false, message: response.message }
   }
 
+  const adminRegister = async (userData: { full_name: string; email: string; password: string; agree_terms: boolean }) => {
+    console.log("[v0] Starting admin registration with data:", userData)
+
+    const response = await apiClient.registerAdmin({
+      ...userData,
+      is_verified: null,
+    })
+
+    console.log("[v0] Admin registration response:", response)
+
+    if (response.success) {
+      return { success: true }
+    }
+
+    return { success: false, message: response.message }
+  }
+
   const logout = () => {
-    localStorage.removeItem("auth_token")
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem("auth_token")
+      window.localStorage.removeItem("is_admin")
+    }
     setUser(null)
   }
 
@@ -159,8 +287,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         isLoading,
         isAuthenticated,
+        isAdmin,
         login,
+        adminLogin,
         register,
+        adminRegister,
         logout,
         updateProfile,
         updatePassword,

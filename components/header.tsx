@@ -1,6 +1,8 @@
 import React from "react";
+import { useNavigate } from "react-router";
 
 export default function Header() {
+  const navigate = useNavigate()
   return (
   <header className="px-6 py-6" style={{ backgroundColor: 'var(--background)'}}>
       <div className="max-w-4xl mx-auto">
@@ -13,6 +15,7 @@ export default function Header() {
                  color: 'var(--color-white)',
                  marginTop: '0.5rem'
                }}
+              onClick={() => navigate('/subscription')}
           >
             <span className="w-4 h-4 text-white">⚡</span>
             <span>Upgrade Plan</span>

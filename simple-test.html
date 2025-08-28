@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Backend Test - BearisterAI</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #db610a;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        button:hover {
+            background-color: #f1750f;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Simple Backend Test</h1>
+        
+        <div class="info">
+            <strong>Testing Backend Connectivity:</strong><br>
+            This will test if your FastAPI backend is accessible from the browser.
+        </div>
+
+        <button onclick="testHealth()" id="healthBtn">Test Health Endpoint</button>
+        <button onclick="testLogin()" id="loginBtn">Test Login Endpoint</button>
+        <button onclick="testSuperadminLogin()" id="superadminBtn">Test Superadmin Login</button>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        async function testHealth() {
+            const button = document.getElementById('healthBtn');
+            const resultDiv = document.getElementById('result');
+            
+            button.disabled = true;
+            button.textContent = 'Testing...';
+            resultDiv.innerHTML = '';
+
+            try {
+                console.log('Testing health endpoint...');
+                const response = await fetch('http://127.0.0.1:8000/health', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                console.log('Response status:', response.status);
+                console.log('Response ok:', response.ok);
+
+                const result = await response.json();
+                console.log('Response data:', result);
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `
+✅ Health endpoint working!
+
+Status: ${response.status}
+Response: ${JSON.stringify(result, null, 2)}
+
+Backend is running and accessible!
+                    `;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `
+❌ Health endpoint failed
+
+Status: ${response.status}
+Response: ${JSON.stringify(result, null, 2)}
+                    `;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `
+❌ Error testing health endpoint: ${error.message}
+
+This could be due to:
+1. CORS issues (backend not allowing browser requests)
+2. Network connectivity issues
+3. Backend not properly configured
+
+Try opening the browser console (F12) to see more details.
+                `;
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Test Health Endpoint';
+            }
+        }
+
+        async function testLogin() {
+            const button = document.getElementById('loginBtn');
+            const resultDiv = document.getElementById('result');
+            
+            button.disabled = true;
+            button.textContent = 'Testing...';
+            resultDiv.innerHTML = '';
+
+            try {
+                console.log('Testing regular login endpoint...');
+                const response = await fetch('http://127.0.0.1:8000/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: "admin@gmail.com",
+                        password: "admin123@"
+                    })
+                });
+
+                console.log('Response status:', response.status);
+                const result = await response.json();
+                console.log('Response data:', result);
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `
+✅ Regular login endpoint working!
+
+Status: ${response.status}
+User: ${result.user?.full_name || 'Unknown'}
+Is Superadmin: ${result.user?.is_superadmin ? 'Yes' : 'No'}
+Role: ${result.role || 'Not specified'}
+
+Response: ${JSON.stringify(result, null, 2)}
+                    `;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `
+❌ Regular login failed
+
+Status: ${response.status}
+Error: ${result.detail || result.message || 'Unknown error'}
+
+Response: ${JSON.stringify(result, null, 2)}
+                    `;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `
+❌ Error testing login: ${error.message}
+
+Check browser console (F12) for more details.
+                `;
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Test Login Endpoint';
+            }
+        }
+
+        async function testSuperadminLogin() {
+            const button = document.getElementById('superadminBtn');
+            const resultDiv = document.getElementById('result');
+            
+            button.disabled = true;
+            button.textContent = 'Testing...';
+            resultDiv.innerHTML = '';
+
+            try {
+                console.log('Testing superadmin login endpoint...');
+                const response = await fetch('http://127.0.0.1:8000/auth/superadmin/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: "admin@gmail.com",
+                        password: "admin123@"
+                    })
+                });
+
+                console.log('Response status:', response.status);
+                const result = await response.json();
+                console.log('Response data:', result);
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `
+✅ Superadmin login endpoint working!
+
+Status: ${response.status}
+User: ${result.user?.full_name || 'Unknown'}
+Is Superadmin: ${result.user?.is_superadmin ? 'Yes' : 'No'}
+Role: ${result.role || 'Not specified'}
+
+Response: ${JSON.stringify(result, null, 2)}
+                    `;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `
+❌ Superadmin login failed
+
+Status: ${response.status}
+Error: ${result.detail || result.message || 'Unknown error'}
+
+Response: ${JSON.stringify(result, null, 2)}
+                    `;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `
+❌ Error testing superadmin login: ${error.message}
+
+Check browser console (F12) for more details.
+                `;
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Test Superadmin Login';
+            }
+        }
+    </script>
+</body>
+</html>

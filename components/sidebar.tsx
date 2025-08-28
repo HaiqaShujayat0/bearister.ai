@@ -24,7 +24,7 @@ const recentChats = [
   "Product Return Guidelines",
 ]
 
-export default function Sidebar() {
+export default function Sidebar({ recentLimit, extraAboveProfile, profileSlot }: { recentLimit?: number; extraAboveProfile?: React.ReactNode; profileSlot?: React.ReactNode }) {
   const { user, logout, isAuthenticated } = useAuth()
   const [showUserMenu, setShowUserMenu] = useState(false)
 
@@ -85,14 +85,10 @@ export default function Sidebar() {
 
   {/* Recent Chats */}
   <div className="px-2 mt-3 pt-3" style={{ borderTop: '1px solid var(--sidebar-border)'}}>
-        {/* TODO: Remove mock recent chats when real chat data is connected. */}
-  <h3 className="text-[11px] font-medium mb-2 uppercase tracking-wide" style={{ color: 'var(--muted-foreground)'}}>Recent Chats</h3>
-
-        {/* Today */}
-        <div className="mb-3">
-          <h4 className="text-[11px] mb-1 uppercase tracking-wide" style={{ color: 'var(--muted-foreground)'}}>TODAY</h4>
+        <h3 className="text-[11px] font-medium mb-2 uppercase tracking-wide" style={{ color: 'var(--muted-foreground)'}}>Recent Chats</h3>
+        {recentLimit ? (
           <div className="space-y-1">
-            {recentChats.slice(0, 2).map((chat, index) => (
+            {recentChats.slice(0, recentLimit).map((chat, index) => (
               <button
                 key={index}
                 className="w-full text-left px-3 py-2 text-sm rounded-lg transition-colors font-medium tracking-tight hover:bg-[rgba(255,255,255,0.04)]"
@@ -102,44 +98,60 @@ export default function Sidebar() {
               </button>
             ))}
           </div>
-        </div>
-
-        {/* Yesterday */}
-        <div className="mb-3">
-          <h4 className="text-[11px] mb-1 uppercase tracking-wide" style={{ color: 'var(--muted-foreground)'}}>YESTERDAY</h4>
-          <div className="space-y-1">
-            {recentChats.slice(2, 4).map((chat, index) => (
-              <button
-                key={index}
-                className="w-full text-left px-3 py-2 text-sm text-[#cdd5df] hover:text-white hover:bg-[rgba(255,255,255,0.04)] rounded-lg transition-colors font-medium tracking-tight"
-              >
-                {chat}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* This Week */}
-        <div className="mb-2">
-          <h4 className="text-[11px] mb-1 uppercase tracking-wide" style={{ color: 'var(--muted-foreground)'}}>THIS WEEK</h4>
-          <div className="space-y-1 pb-2">
-            {recentChats.slice(4).map((chat, index) => (
-              <button
-                key={index}
-                className="w-full text-left px-3 py-2 text-sm text-[#cdd5df] hover:text-white hover:bg-[rgba(255,255,255,0.04)] rounded-lg transition-colors font-medium tracking-tight"
-              >
-                {chat}
-              </button>
-            ))}
-          </div>
-        </div>
+        ) : (
+          <>
+            <div className="mb-3">
+              <h4 className="text-[11px] mb-1 uppercase tracking-wide" style={{ color: 'var(--muted-foreground)'}}>TODAY</h4>
+              <div className="space-y-1">
+                {recentChats.slice(0, 2).map((chat, index) => (
+                  <button
+                    key={index}
+                    className="w-full text-left px-3 py-2 text-sm rounded-lg transition-colors font-medium tracking-tight hover:bg-[rgba(255,255,255,0.04)]"
+                    style={{ color: 'var(--sidebar-foreground)', background: 'transparent' }}
+                  >
+                    {chat}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="mb-3">
+              <h4 className="text-[11px] mb-1 uppercase tracking-wide" style={{ color: 'var(--muted-foreground)'}}>YESTERDAY</h4>
+              <div className="space-y-1">
+                {recentChats.slice(2, 4).map((chat, index) => (
+                  <button
+                    key={index}
+                    className="w-full text-left px-3 py-2 text-sm text-[#cdd5df] hover:text-white hover:bg-[rgba(255,255,255,0.04)] rounded-lg transition-colors font-medium tracking-tight"
+                  >
+                    {chat}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="mb-2">
+              <h4 className="text-[11px] mb-1 uppercase tracking-wide" style={{ color: 'var(--muted-foreground)'}}>THIS WEEK</h4>
+              <div className="space-y-1 pb-2">
+                {recentChats.slice(4).map((chat, index) => (
+                  <button
+                    key={index}
+                    className="w-full text-left px-3 py-2 text-sm text-[#cdd5df] hover:text-white hover:bg-[rgba(255,255,255,0.04)] rounded-lg transition-colors font-medium tracking-tight"
+                  >
+                    {chat}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
       </div>
       {/* end scrollable content */}
       </div>
 
   {/* User Profile (anchored bottom) */}
   <div className="p-3" style={{ borderTop: '1px solid var(--sidebar-border)'}}>
-  {isAuthenticated && user ? (
+  {extraAboveProfile}
+  {profileSlot ? (
+        <>{profileSlot}</>
+      ) : isAuthenticated && user ? (
           <div className="relative">
             <button
               onClick={() => setShowUserMenu(!showUserMenu)}

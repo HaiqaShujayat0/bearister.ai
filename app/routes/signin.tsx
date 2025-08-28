@@ -31,7 +31,8 @@ export default function SignInPage() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate("/")
+      // Don't auto-redirect here, let the login handler decide where to go
+      console.log("User is already authenticated, but letting login handler decide redirect")
     }
   }, [isAuthenticated, navigate])
 
@@ -43,8 +44,12 @@ export default function SignInPage() {
     const result = await login(formData.email, formData.password)
 
     if (result.success) {
-      navigate("/")
+      console.log("Login successful")
+      // Send regular users to user dashboard
+      console.log("Redirecting to user dashboard")
+      navigate("/dashboard")
     } else {
+      console.log("Login failed:", result.message)
       setError(result.message || "Failed to sign in")
     }
 

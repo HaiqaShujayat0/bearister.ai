@@ -8,6 +8,14 @@ export interface RegisterRequest {
   is_verified?: boolean | null
 }
 
+export interface AdminRegisterRequest {
+  full_name: string
+  email: string
+  password: string
+  agree_terms: boolean
+  is_verified?: boolean | null
+}
+
 export interface LoginRequest {
   email: string
   password: string
@@ -34,6 +42,15 @@ export interface LoginResponse {
   access_token?: string;
   token?: string;
   auth_token?: string;
+  user?: {
+    id?: string | number
+    full_name?: string
+    email?: string
+    agree_terms?: boolean
+    is_superadmin?: boolean
+    is_verified?: boolean
+  }
+  role?: string
 }
 
 export interface UserProfile {
@@ -41,6 +58,23 @@ export interface UserProfile {
   full_name: string;
   email: string;
   phone?: string;
+  is_superadmin?: boolean;
+}
+
+export interface UserWithSubscription {
+  id?: string | number;
+  full_name?: string;
+  email?: string;
+  phone?: string | null;
+  is_superadmin?: boolean;
+  subscription_data?: {
+    plan?: string | null;
+    messages_used?: number | null;
+    messages_limit?: number | null;
+    documents_used?: number | null;
+    documents_limit?: number | null;
+  } | null;
+  created_at?: string | null;
 }
 
 class ApiClient {
@@ -88,7 +122,7 @@ class ApiClient {
 
       const response = await fetch(`${API_BASE_URL}${safeEndpoint}`, {
         mode: "cors",
-        credentials: "include",
+        credentials: "omit", // Changed from "include" to "omit" to avoid CORS preflight
         ...fetchOptions,
         // IMPORTANT: set merged headers LAST so they are not overwritten
         headers,
@@ -181,9 +215,29 @@ class ApiClient {
     })
   }
 
+  // Admin registration
+  async registerAdmin(adminData: AdminRegisterRequest) {
+    return this.request("/auth/superadmin/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(adminData),
+      timeoutMs: 30000,
+    })
+  }
+
 
   async login(credentials: LoginRequest) {
     return this.request<LoginResponse>("/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(credentials),
+      timeoutMs: 25000,
+    });
+  }
+
+  // Superadmin login (admin)
+  async loginSuperadmin(credentials: LoginRequest) {
+    return this.request<LoginResponse>("/auth/superadmin/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(credentials),
@@ -228,6 +282,18 @@ class ApiClient {
     })
   }
 
+  // Admin password reset request
+  async requestAdminPasswordReset(email: string) {
+    const form = new URLSearchParams()
+    form.set("email", email)
+    return this.request("/auth/superadmin/forgot-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: form.toString(),
+      timeoutMs: 25000,
+    })
+  }
+
   async resetPassword(token: string, newPassword: string) {
     console.log("=== API RESET PASSWORD DEBUG ===")
     console.log("API: resetPassword called with token length:", token.length)
@@ -256,6 +322,35 @@ class ApiClient {
     return result
   }
 
+  // Admin password reset
+  async resetAdminPassword(token: string, newPassword: string) {
+    console.log("=== API ADMIN RESET PASSWORD DEBUG ===")
+    console.log("API: resetAdminPassword called with token length:", token.length)
+    console.log("API: Token first 10 chars:", token.substring(0, 10) + "...")
+    console.log("API: Password length:", newPassword.length)
+    
+    const form = new URLSearchParams()
+    form.set("token", token)
+    form.set("new_password", newPassword)
+    
+    console.log("API: Form data (token hidden):", `token=***&new_password=***`)
+    console.log("API: Making request to /auth/superadmin/reset-password")
+    console.log("API: Full URL:", `${API_BASE_URL}/auth/superadmin/reset-password`)
+    
+    const result = await this.request("/auth/superadmin/reset-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: form.toString(),
+      timeoutMs: 25000,
+    })
+    
+    console.log("API: resetAdminPassword response:", result)
+    console.log("API: Response success:", result.success)
+    console.log("API: Response message:", result.message)
+    console.log("=== END API DEBUG ===")
+    return result
+  }
+
   async verifyEmail(token: string) {
     // The backend expects the verification token as a query parameter
     // (e.g. /auth/verify-email?token=...). Sending it in the URL avoids
@@ -263,6 +358,14 @@ class ApiClient {
     const safeToken = encodeURIComponent(token)
     return this.request(`/auth/verify-email?token=${safeToken}`, {
       method: "GET",
+    })
+  }
+
+  // Admin: fetch all users (excluding superadmin expected to be handled server-side)
+  async getAdminUsers() {
+    return this.request<UserWithSubscription[]>("/auth/admin/users", {
+      method: "GET",
+      timeoutMs: 20000,
     })
   }
 
